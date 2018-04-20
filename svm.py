@@ -61,15 +61,15 @@ def svc_get_para(svc):
     prob_b = svc.probB_
     gamma = svc._gamma
     classes = svc.classes_
-    hyper = svc.get_params(deep=True)
+    # hyper = svc.get_params(deep=True)
     ret = {'support': support, 'support_vectors': support_vectors, 'n_support': n_support, 'dual_coef': dual_coef,
            'intercept': intercept, 'sparse': sparse, 'shape_fit': shape_fit, 'prob_a': prob_a, 'prob_b': prob_b,
-           'gamma': gamma, 'classes': classes, 'hyper': hyper}
+           'gamma': gamma, 'classes': classes}
     return ret
 
 
 def svc_set_para(svc, svc_para):
-    svc.set_params(**svc_para['hyper'])
+    # svc.set_params(**svc_para['hyper'])
     svc.support_ = svc_para['support']
     svc.support_vectors_ = svc_para['support_vectors']
     svc.n_support_ = svc_para['n_support']
@@ -86,7 +86,7 @@ def svc_set_para(svc, svc_para):
 if __name__ == '__main__':
     train = io.loadmat("Proj2FeatVecsSet1.mat")["Proj2FeatVecsSet1"]
     label = np.argmax(io.loadmat("Proj2TargetOutputsSet1.mat")["Proj2TargetOutputsSet1"], axis=1)
-    e_train, _, e_label, _ = train_test_split(train, label, train_size=0.2, random_state=0)
+    e_train, _, e_label, _ = train_test_split(train, label, train_size=0.1, random_state=0)
     _, v_train, _, v_label = train_test_split(train, label, test_size=0.2, random_state=0)
     s_para = {'C': 1.0, 'kernel': 'rbf', 'degree': 3, 'gamma': 'auto', 'coef0': 0.0, 'probability': True,
               'shrinking': True, 'tol': 1e-3, 'cache_size': 800, 'class_weight': 'balanced', 'verbose': False,
@@ -95,7 +95,7 @@ if __name__ == '__main__':
     c_svc = get_svc({'parameters': s_para})
     svc_train(c_svc, e_train, e_label)
     trained_para = svc_get_para(c_svc)
-    n_svc = SVC()
+    n_svc = SVC(s_para)
     svc_set_para(n_svc, trained_para)
     # n_svc.set_params(**svc.get_params())
     print(svc_score(c_svc, v_train, v_label))

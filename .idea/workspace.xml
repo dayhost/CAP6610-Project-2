@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="56b15a2b-fb5f-4305-a138-c7d8a2dd03d6" name="Default" comment="" />
+    <list default="true" id="56b15a2b-fb5f-4305-a138-c7d8a2dd03d6" name="Default" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+    </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -14,15 +16,24 @@
   </component>
   <component name="FileEditorManager">
     <leaf>
-      <file leaf-file-name="train_my_class_gpr.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="train_my_class_gpr.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/train_my_class_gpr.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="341">
-              <caret line="465" column="17" lean-forward="false" selection-start-line="465" selection-start-column="17" selection-end-line="465" selection-end-column="17" />
+            <state relative-caret-position="253">
+              <caret line="481" column="22" lean-forward="false" selection-start-line="481" selection-start-column="22" selection-end-line="481" selection-end-column="22" />
               <folding>
                 <element signature="e#0#62#0" expanded="true" />
-                <marker date="1524195230046" expanded="true" signature="13141:22833" ph="..." />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name=".gitignore" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/.gitignore">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="0">
+              <caret line="0" column="6" lean-forward="false" selection-start-line="0" selection-start-column="6" selection-end-line="0" selection-end-column="6" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -54,6 +65,7 @@
       <list>
         <option value="$PROJECT_DIR$/SVM_process_data.py" />
         <option value="$PROJECT_DIR$/train_my_class_gpr.py" />
+        <option value="$PROJECT_DIR$/.gitignore" />
       </list>
     </option>
   </component>
@@ -271,12 +283,19 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/train_my_class_gpr.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="341">
-          <caret line="465" column="17" lean-forward="false" selection-start-line="465" selection-start-column="17" selection-end-line="465" selection-end-column="17" />
+        <state relative-caret-position="253">
+          <caret line="481" column="22" lean-forward="false" selection-start-line="481" selection-start-column="22" selection-end-line="481" selection-end-column="22" />
           <folding>
             <element signature="e#0#62#0" expanded="true" />
-            <marker date="1524195230046" expanded="true" signature="13141:22833" ph="..." />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/.gitignore">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="6" lean-forward="false" selection-start-line="0" selection-start-column="6" selection-end-line="0" selection-end-column="6" />
+          <folding />
         </state>
       </provider>
     </entry>

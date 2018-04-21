@@ -49,7 +49,6 @@ def TestMyClassifier(XTest,Parameters,EstParameters):
     sigmoid = 1 - expit(prob_std)
     result = np.concatenate([Ytest, sigmoid], axis=1)
     result = result / np.repeat((sigmoid + 1), axis=1, repeats = np.shape(clf.classes_)[0] + 1)
-    print(Ytest)
     return result
 
 Parameters = { 'n_iter':100, 'tol':1e-4, 'n_iter_solver':15, 'tol_solver':1e-4,

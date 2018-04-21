@@ -22,9 +22,25 @@ def my_svm(estimate, labels, validate, parameters):
     prob_std = np.ndarray.std(prob, axis=1)[:, np.newaxis]
     sigmoid = 1 - expit(prob_std)
     result = np.concatenate([prob, sigmoid], axis=1)
-    result = result / np.repeat((sigmoid + 1), axis=1, repeats=6)
-
+    result = result / np.repeat((sigmoid + 1), axis=1, repeats=len(svc.classes_)+1)
     return result
+
+
+"""
+                      C : 1, 5, 10
+                 kernel : 'rbf', 'poly'
+                 degree : 2, 3, 5
+                  gamma : 'auto'
+                  coef0 : 0.0
+            probability : True
+              shrinking : True
+                    tol : 1e-3, 1e-4
+           class_weight : 'balanced'
+                verbose : False
+               max_iter : -1
+decision_function_shape : 'ovr'
+           random_state : None
+"""
 
 
 def get_svc(parameters):
@@ -48,6 +64,7 @@ def svc_predict(svc, validate):
 
 
 def svc_probability(svc, validate):
+    # call this function to get the probability with no unknow class
     return svc.predict_proba(validate)
 
 
@@ -92,8 +109,8 @@ def svc_set_para(svc, svc_para):
 if __name__ == '__main__':
     train = io.loadmat("Proj2FeatVecsSet1.mat")["Proj2FeatVecsSet1"]
     label = np.argmax(io.loadmat("Proj2TargetOutputsSet1.mat")["Proj2TargetOutputsSet1"], axis=1)
-    e_train, _, e_label, _ = train_test_split(train, label, train_size=0.2, random_state=0)
-    _, v_train, _, v_label = train_test_split(train, label, test_size=0.01, random_state=0)
+    e_train, _, e_label, _ = train_test_split(train, label, train_size=0.5, random_state=0)
+    _, v_train, _, v_label = train_test_split(train, label, test_size=0.5, random_state=0)
     s_para = {'C': 1.0, 'kernel': 'rbf', 'degree': 3, 'gamma': 'auto', 'coef0': 0.0, 'probability': True,
               'shrinking': True, 'tol': 1e-3, 'cache_size': 800, 'class_weight': 'balanced', 'verbose': False,
               'max_iter': -1, 'decision_function_shape': 'ovr', 'random_state': None}
@@ -101,7 +118,7 @@ if __name__ == '__main__':
     v_label = v_label + 1
     v_label = v_label[:, np.newaxis]
     # result = np.concatenate([res, v_label], axis=1)
-    io.savemat('results_probability', {'prob': res, 'label': v_label}, do_compression=True)
+    # io.savemat('results_probability', {'prob': res, 'label': v_label}, do_compression=True)
     print ('done!')
     # c_svc = get_svc({'parameters': s_para})
     # svc_train(c_svc, e_train, e_label)

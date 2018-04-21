@@ -73,7 +73,7 @@ def TrainMyClassifier(XEstimate, ClassLabels, XValidate, Parameters):
         result = np.concatenate([predict_prob0, predict_prob1, predict_prob2, predict_prob3, predict_prob4], axis=1)
 
         std = np.std(result, axis=1)[:, np.newaxis]
-        other_prob = np.exp(-std) / (1 + np.exp(-std))
+        other_prob = np.exp(-std) / (1 + np.exp(std * 5))
         result = np.concatenate([result, other_prob], axis=1)
         result = result / np.repeat((other_prob + 1), axis=1, repeats=6)
 
@@ -133,6 +133,11 @@ def TestMyClassifier(XTest, Parameters, EstParameters):
 
     result = np.concatenate([predict_prob0, predict_prob1, predict_prob2, predict_prob3, predict_prob4], axis=1)
 
+    std = np.std(result, axis=1)[:, np.newaxis]
+    other_prob = np.exp(-std) / (1 + np.exp(std * 5))
+    result = np.concatenate([result, other_prob], axis=1)
+    result = result / np.repeat((other_prob + 1), axis=1, repeats=6)
+
     return result
 
 if __name__ == "__main__":
@@ -146,7 +151,7 @@ if __name__ == "__main__":
     label_data = np.argmax(label_data, axis=1)[:, np.newaxis]
     dataset = np.concatenate([train_data, label_data], axis=1)
     np.random.shuffle(dataset)
-    training = dataset[:3000]
+    training = dataset[:5000]
     validation = dataset[1000:1100]
     xeval = training[:, :-1]
     print(xeval.shape)

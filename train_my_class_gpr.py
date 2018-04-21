@@ -1,7 +1,26 @@
 from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.gaussian_process.kernels import ExpSineSquared
+from sklearn.gaussian_process.kernels import RBF
 import numpy as np
 
+"""
+Parameter range
+    {
+    "kernel": [ 1.0 * RBF(1), 
+            2.0 * RBF(1),
+            3.0 * RBF(1),
+            1.0 * RBF(2),
+            1.0 * RBF(3)
+            ]
+    "optimizer": ["fmin_l_bfgs_b"],
+    "n_restarts_optimizer": [0],
+    "max_iter_predict": [100],
+    "warm_start": [True],
+    "copy_X_train": [True],
+    "random_state": [0],
+    "multi_class": ["one_vs_one"],
+    "n_jobs": [-1]
+    }
+"""
 
 def TrainMyClassifier(XEstimate, ClassLabels, XValidate, Parameters):
     """
@@ -27,24 +46,48 @@ def TrainMyClassifier(XEstimate, ClassLabels, XValidate, Parameters):
     :return:
     """
     if Parameters["algorithm"] == "GPR":
+        # get the classes from the labels
+        classes = np.unique(ClassLabels, axis=0)
+        sorted(classes, reverse=True)
+        num_class = len(classes)
+
+        # get data and label based on classes
         data = []
-        for i in range(5):
-            data.append(XEstimate[ClassLabels == i])
+        for cla in classes:
+            data.append(XEstimate[ClassLabels == cla])
 
         target = []
-        for i in range(5):
-            target.append(ClassLabels[ClassLabels == i])
+        for cla in classes:
+            target.append(ClassLabels[ClassLabels == cla])
 
-        combined_data = []
-        combined_target = []
-        for i in range(5):
-            for j in range(i+1, 5):
-                combined_data.append(np.concatenate([data[i], data[j]], axis=0))
-                combined_target.append(np.concatenate([target[i], target[j]], axis=0))
+        # put data and label into a matrix, so that we could do a easier calculation for probability
+        # the following calculation is all based on the matrix
+        data_matrix = []
+        for i in range(num_class - 1):
+            data_matrix.append([])
+            for j in range(num_class - 1):
+                data_matrix[i].append(None)
 
-        classifier = []
-        for i in range(10):
-            gpc_classifier = GaussianProcessClassifier(
+        target_matrix = []
+        for i in range(num_class - 1):
+            target_matrix.append([])
+            for j in range(num_class - 1):
+                target_matrix[i].append(None)
+
+        for i in range(num_class-1):
+            for j in range(i, num_class-1):
+                data_matrix[i][j] = np.concatenate([data[i], data[j+1]], axis=0)
+                target_matrix[i][j] = np.concatenate([target[i], target[j+1]], axis=0)
+
+        classifier_matrix = []
+        for i in range(num_class-1):
+            classifier_matrix.append([])
+            for j in range(num_class-1):
+                classifier_matrix[i].append(None)
+
+        for i in range(num_class-1):
+            for j in range(i, num_class-1):
+                gpc_classifier = GaussianProcessClassifier(
                     kernel=Parameters["parameters"]["kernel"],
                     optimizer=Parameters["parameters"]["optimizer"],
                     n_restarts_optimizer=Parameters["parameters"]["n_restarts_optimizer"],
@@ -55,39 +98,53 @@ def TrainMyClassifier(XEstimate, ClassLabels, XValidate, Parameters):
                     multi_class="one_vs_rest",
                     n_jobs=Parameters["parameters"]["n_jobs"]
                 )
-            gpc_classifier.fit(combined_data[i], combined_target[i])
-            classifier.append(gpc_classifier)
+                gpc_classifier.fit(data_matrix[i][j], target_matrix[i][j])
+                classifier_matrix[i][j] = gpc_classifier
 
-        out = []
-        for i in range(10):
-            tmp_out = classifier[i].predict_proba(XValidate)
-            out.append(tmp_out)
+        out_matrix = []
+        for i in range(num_class-1):
+            out_matrix.append([])
+            for j in range(num_class-1):
+                out_matrix[i].append(None)
+
+        for i in range(num_class-1):
+            for j in range(i, num_class-1):
+                out_matrix[i][j] = classifier_matrix[i][j].predict_proba(XValidate)
 
         # calculate the whole prediction prob
-        predict_prob0 = np.expand_dims((out[0][:, 0] + out[1][:, 0] + out[2][:, 0] + out[3][:, 0]) / 10, axis=1)
-        predict_prob1 = np.expand_dims((out[0][:, 1] + out[4][:, 0] + out[5][:, 0] + out[6][:, 0]) / 10, axis=1)
-        predict_prob2 = np.expand_dims((out[1][:, 1] + out[4][:, 1] + out[7][:, 0] + out[8][:, 0]) / 10, axis=1)
-        predict_prob3 = np.expand_dims((out[2][:, 1] + out[5][:, 1] + out[7][:, 1] + out[9][:, 0]) / 10, axis=1)
-        predict_prob4 = np.expand_dims((out[3][:, 1] + out[6][:, 1] + out[8][:, 1] + out[9][:, 1]) / 10, axis=1)
+        val_shape = XValidate.shape[0]
+        predict_prob_list = []
+        for i in range(num_class):
+            predict_prob_list.append(np.zeros(shape=[val_shape, 1]))
 
-        result = np.concatenate([predict_prob0, predict_prob1, predict_prob2, predict_prob3, predict_prob4], axis=1)
+        for i in range(num_class-1):
+            for j in range(i, num_class-1):
+                predict_prob_list[i] += out_matrix[i][j][:, 0][:, np.newaxis] / (num_class * 2)
+                predict_prob_list[j + 1] += out_matrix[i][j][:, 1][:, np.newaxis] / (num_class * 2)
 
+        # get the result of num_class probability
+        result = np.concatenate(predict_prob_list, axis=1)
+
+        # calculate the probability for the one more class
         std = np.std(result, axis=1)[:, np.newaxis]
         other_prob = np.exp(-std) / (1 + np.exp(std * 5))
         result = np.concatenate([result, other_prob], axis=1)
-        result = result / np.repeat((other_prob + 1), axis=1, repeats=6)
+        result = result / np.repeat((other_prob + 1), axis=1, repeats=num_class + 1)
 
+        # put all the parameters into a dict
         estParameters = {}
+        estParameters["class_num"] = num_class
         estParameters["parameters"] = []
-        for i in range(10):
-            estParameters["parameters"].append(
-                {
-                    "log_marginal_likelihood_value_": classifier[i].log_marginal_likelihood_value_,
-                    "classes_": classifier[i].classes_,
-                    "n_classes_": classifier[i].n_classes_,
-                    "base_estimator_": classifier[i].base_estimator_
-                }
-            )
+        for i in range(num_class-1):
+            for j in range(i, num_class-1):
+                estParameters["parameters"].append(
+                    {
+                        "log_marginal_likelihood_value_": classifier_matrix[i][j].log_marginal_likelihood_value_,
+                        "classes_": classifier_matrix[i][j].classes_,
+                        "n_classes_": classifier_matrix[i][j].n_classes_,
+                        "base_estimator_": classifier_matrix[i][j].base_estimator_
+                    }
+                )
 
         return result, estParameters
 
@@ -100,8 +157,10 @@ def TestMyClassifier(XTest, Parameters, EstParameters):
     :param EstParameters: parameter in the model
     :return:
     """
+    num_class = EstParameters["class_num"]
     classifier = []
-    for param_dict in EstParameters["paramemters"]:
+    # init all the classifiers
+    for param_dict in EstParameters["parameters"]:
         gpc_classifier = GaussianProcessClassifier(
             kernel=Parameters["parameters"]["kernel"],
             optimizer=Parameters["parameters"]["optimizer"],
@@ -119,24 +178,48 @@ def TestMyClassifier(XTest, Parameters, EstParameters):
         gpc_classifier.base_estimator_ = param_dict["base_estimator_"]
         classifier.append(gpc_classifier)
 
-    out = []
-    for i in range(10):
-        tmp_out = classifier[i].predict_proba(XTest)
-        out.append(tmp_out)
+    # put all the classifiers into a matrix, so it is easier for calculation
+    classifier_matrix = []
+    for i in range(num_class-1):
+        classifier_matrix.append([])
+        for j in range(num_class-1):
+            classifier_matrix[i].append(None)
+
+    count = 0
+    for i in range(num_class-1):
+        for j in range(i, num_class-1):
+            classifier_matrix[i][j] = classifier[count]
+            count += 1
+
+    # calculate the output for XTest
+    out_matrix = []
+    for i in range(num_class - 1):
+        out_matrix.append([])
+        for j in range(num_class - 1):
+            out_matrix[i].append(None)
+
+    for i in range(num_class - 1):
+        for j in range(i, num_class - 1):
+            out_matrix[i][j] = classifier_matrix[i][j].predict_proba(XTest)
 
     # calculate the whole prediction prob
-    predict_prob0 = np.expand_dims((out[0][:, 0] + out[1][:, 0] + out[2][:, 0] + out[3][:, 0]) / 10, axis=1)
-    predict_prob1 = np.expand_dims((out[0][:, 1] + out[4][:, 0] + out[5][:, 0] + out[6][:, 0]) / 10, axis=1)
-    predict_prob2 = np.expand_dims((out[1][:, 1] + out[4][:, 1] + out[7][:, 0] + out[8][:, 0]) / 10, axis=1)
-    predict_prob3 = np.expand_dims((out[2][:, 1] + out[5][:, 1] + out[7][:, 1] + out[9][:, 0]) / 10, axis=1)
-    predict_prob4 = np.expand_dims((out[3][:, 1] + out[6][:, 1] + out[8][:, 1] + out[9][:, 1]) / 10, axis=1)
+    val_shape = XTest.shape[0]
+    predict_prob_list = []
+    for i in range(num_class):
+        predict_prob_list.append(np.zeros(shape=[val_shape, 1]))
 
-    result = np.concatenate([predict_prob0, predict_prob1, predict_prob2, predict_prob3, predict_prob4], axis=1)
+    for i in range(num_class - 1):
+        for j in range(i, num_class - 1):
+            predict_prob_list[i] += out_matrix[i][j][:, 0][:, np.newaxis] / (num_class * 2)
+            predict_prob_list[j + 1] += out_matrix[i][j][:, 1][:, np.newaxis] / (num_class * 2)
 
+    result = np.concatenate(predict_prob_list, axis=1)
+
+    # calculate the probability for the one more class
     std = np.std(result, axis=1)[:, np.newaxis]
     other_prob = np.exp(-std) / (1 + np.exp(std * 5))
     result = np.concatenate([result, other_prob], axis=1)
-    result = result / np.repeat((other_prob + 1), axis=1, repeats=6)
+    result = result / np.repeat((other_prob + 1), axis=1, repeats=num_class + 1)
 
     return result
 
@@ -151,20 +234,16 @@ if __name__ == "__main__":
     label_data = np.argmax(label_data, axis=1)[:, np.newaxis]
     dataset = np.concatenate([train_data, label_data], axis=1)
     np.random.shuffle(dataset)
-    training = dataset[:5000]
+    training = dataset[:1000]
     validation = dataset[1000:1100]
     xeval = training[:, :-1]
-    print(xeval.shape)
     xlabel = np.squeeze(training[:, -1:], axis=1)
-    print(xlabel.shape)
     xval = validation[:, :-1]
     result, params = TrainMyClassifier(xeval, xlabel, xval,
                       {
                           "algorithm": "GPR",
                           "parameters": {
-                              # "kernel": ExpSineSquared(0.0003, 1.2), # best one
-                              # "kernel": ExpSineSquared(1e-3, 1e-0),
-                              "kernel": None,
+                              "kernel": 1.0 * RBF(1),
                               "optimizer": "fmin_l_bfgs_b",
                               "n_restarts_optimizer": 0,
                               "max_iter_predict": 100,
@@ -177,10 +256,32 @@ if __name__ == "__main__":
                       })
     xval_target = validation[:, -1:]
     result = np.argmax(result, axis=1)
+    print("eval result: " + str(result))
     count = 0
     for i in range(len(result)):
         if result[i] == xval_target[i][0]:
             count += 1
-    print(result)
-    print("accurcy: %.3f" % (count / (len(result) * 1.0)))
+    print("eval accurcy: %.3f" % (count / (len(result) * 1.0)))
+
+    result = TestMyClassifier(xval, {
+                          "algorithm": "GPR",
+                          "parameters": {
+                              "kernel": 1.0 * RBF(1),
+                              "optimizer": "fmin_l_bfgs_b",
+                              "n_restarts_optimizer": 0,
+                              "max_iter_predict": 100,
+                              "warm_start": True,
+                              "copy_X_train": True,
+                              "random_state": 0,
+                              "multi_class": "one_vs_one",
+                              "n_jobs": -1
+                          }
+                      }, params)
+    result = np.argmax(result, axis=1)
+    print("test result: " + str(result))
+    count = 0
+    for i in range(len(result)):
+        if result[i] == xval_target[i][0]:
+            count += 1
+    print("test accurcy: %.3f" % (count / (len(result) * 1.0)))
 

@@ -1,60 +1,91 @@
 from sklearn import datasets
-from skbayes.rvm_ard_models import RVC
+from skrvm import RVC
 from scipy.special import expit
 import numpy as np
+import scipy.io as io
+
+'''========================== Method to train RVM OneVsOne with NC2 classifiers======================================'''
 def RVM(XEstimate,ClassLabels, XValidate, Parameters):
-    clf =  RVC( n_iter = Parameters.get('n_iter'),
-                tol = Parameters.get('tol'),
-                n_iter_solver = Parameters.get('n_iter_solver'),
-                tol_solver = Parameters.get('tol_solver'),
-                fit_intercept = Parameters.get('fit_intercept'),
-                verbose = Parameters.get('verbose'),
-                kernel = Parameters.get('kernel'),
-                degree = Parameters.get('degree'),
-                gamma = Parameters.get('gamma'),
-                coef0 = Parameters.get('coef0'),
-                kernel_params = Parameters.get('kernel_params') )
+    clf =  RVC(alpha=Parameters.get('alpha'),beta=Parameters.get('beta'),n_iter=Parameters.get('n_iter'),verbose='true')
     clf.fit(XEstimate, ClassLabels)
-    Yvalidate = clf.predict_proba(XValidate)
-    EstParameters = { 'relevant_vectors':clf.relevant_vectors_ ,'coef':clf.coef_,'active':clf.active_,
-                      'intercept':clf.intercept_,'mean':clf._x_mean, 'std':clf._x_std,'classes':clf.classes_,
-                      'lambda':clf.lambda_,'sigma':clf.sigma_,'relevant':clf.relevant_}
+    if np.shape(clf.classes_)[0] == 2:
+        Yvalidate = clf.predict(XValidate)
+    else:
+        Yvalidate = predict_proba(clf,XValidate)
+    EstParameters = get_params(clf)
     return Yvalidate,EstParameters
 
-
+''' ========================== Method to Predict labels using RVM ==================================================='''
 def TestMyClassifier(XTest,Parameters,EstParameters):
-    clf = RVC(n_iter=Parameters.get('n_iter'),
-              tol=Parameters.get('tol'),
-              n_iter_solver=Parameters.get('n_iter_solver'),
-              tol_solver=Parameters.get('tol_solver'),
-              fit_intercept=Parameters.get('fit_intercept'),
-              verbose=Parameters.get('verbose'),
-              kernel=Parameters.get('kernel'),
-              degree=Parameters.get('degree'),
-              gamma=Parameters.get('gamma'),
-              coef0=Parameters.get('coef0'),
-              kernel_params=Parameters.get('kernel_params'))
-    clf.relevant_vectors_ = EstParameters.get('relevant_vectors')
-    clf.relevant_ = EstParameters.get('relevant')
-    clf.active_ = EstParameters.get('active')
-    clf.coef_ = EstParameters.get('coef')
-    clf.intercept_ = EstParameters.get('intercept')
-    clf._x_mean = EstParameters.get('mean')
-    clf._x_std = EstParameters.get('std')
-    clf.classes_ = EstParameters.get('classes')
-    clf.lambda_ = EstParameters.get('lambda')
-    clf.sigma_ = EstParameters.get('sigma')
-    Ytest = clf.predict_proba(XTest)
-    prob_std = np.ndarray.std(Ytest, axis=1)[:, np.newaxis]
+    if len(EstParameters) == 1:
+        clf = EstParameters.get('clf')
+    else:
+        clf = EstParameters[0]
+    if np.shape(clf.classes_)[0] == 2:
+        Ytest = clf.predict_proba(XTest)
+    else:
+        Ytest = predict_proba(clf,XTest)
+    return Ytest
+
+'''============================ Predicts probability of labels for RVM ==============================================='''
+def predict_proba(clf,XValidate):
+    noOfClasses = np.shape(clf.classes_)[0]
+    noOfClassifiers = (noOfClasses * (noOfClasses-1))/2
+    print('no of Classifiers',noOfClassifiers)
+    dataSize = np.shape(XValidate)[0]
+    Yvalidate = np.zeros((dataSize, np.shape(clf.classes_)[0]))
+    c = 0
+    prob = clf.multi_.estimators_[c].predict_proba(XValidate)
+    #Summing Fkm(X) where k!=m
+    for i in range(0,noOfClasses):
+        for j in range(i, noOfClasses):
+            if (i < j):
+                Yvalidate[:, i] =  Yvalidate[:, i]+ prob[:, 0]
+                Yvalidate[:, j] =  Yvalidate[:, j]+ prob[:, 1]
+                c = c + 1;
+                if(c<noOfClassifiers):
+                    prob = clf.multi_.estimators_[c].predict_proba(XValidate)
+    #Calculating 1/G(summation(ykm))
+    Yvalidate = Yvalidate / np.shape(clf.classes_)[0]
+    #Calculating probability of XValidate  not belonging to any class
+    prob_std = np.ndarray.std(Yvalidate, axis=1)[:, np.newaxis]
     sigmoid = 1 - expit(prob_std)
-    result = np.concatenate([Ytest, sigmoid], axis=1)
-    result = result / np.repeat((sigmoid + 1), axis=1, repeats = np.shape(clf.classes_)[0] + 1)
-    return result
+    Yvalidate = np.concatenate([Yvalidate, sigmoid], axis=1)
+    Yvalidate = Yvalidate / np.repeat((sigmoid + 1), axis=1, repeats=np.shape(clf.classes_)[0] + 1)
+    return Yvalidate
 
-Parameters = { 'n_iter':100, 'tol':1e-4, 'n_iter_solver':15, 'tol_solver':1e-4,
-                 'fit_intercept':True, 'verbose': False, 'kernel':'rbf', 'degree': 2,
-                 'gamma': None, 'coef0':1, 'kernel_params':None }
+'''====================== Method to get the Parameters and the HyperParameters ====================================='''
+def get_params(clf):
+    if np.shape(clf.classes_)[0] == 2:
+        Parameters = [{'phi': clf.phi,'relevance': clf.relevance_,'alpha': clf.alpha_,'beta': clf.beta_,'m': clf.m_,
+                       'gamma': clf.gamma,'bias': clf.bias,'clf': clf}]
+    else :
+        Parameters = [clf]
+        for c in clf.multi_.estimators_:
+            Parameter = {'phi': c.phi,'relevance': c.relevance_,'alpha': c.alpha_,'beta': c.beta_,'m': c.m_,
+                         'gamma': c.gamma,'bias': c.bias,'clf': c}
+            Parameters.append(Parameter)
+    return Parameters
 
+'''==================================== Testing Part ============================================================== '''
+# Hpyer Parameter Range : alpha 100,1,1e-6, beta 1.e-2 1.e-6 1.e-8,
+
+#Default Parameters
+''' kernel='rbf',degree=3,coef1=None,coef0=0.0,n_iter=500,tol=1e-3,alpha=1e-6,
+    threshold_alpha=1e9,beta=1.e-6,beta_fixed=False,bias_used=True,verbose=False '''
+
+
+Parameters = { 'alpha':1e-6,'beta':1.e-8,'n_iter':200 }
 iris = datasets.load_iris()
-Yvalidate,EstParameters = RVM(iris.data, iris.target, iris.data[1:6] ,Parameters)
-print(TestMyClassifier(iris.data[1:5],Parameters,EstParameters))
+train = io.loadmat("/Users/devanshusingh/PycharmProjects/ML/ML2/Proj2FeatVecsSet1.mat")['Proj2FeatVecsSet1']
+# label shape is [25000, 5] as [num_sample, num_class]
+label = io.loadmat("/Users/devanshusingh/PycharmProjects/ML/ML2/Proj2TargetOutputsSet1.mat")['Proj2TargetOutputsSet1']
+label = np.argmax(label, axis=1)
+
+Yvalidate,EstParameters = RVM(iris.data, iris.target, iris.data ,Parameters)
+#print(EstParameters)
+from sklearn.metrics import accuracy_score
+print(np.argmax(Yvalidate ,axis=1))
+print(iris.target)
+print(accuracy_score(np.argmax(Yvalidate ,axis=1), iris.target))
+#print(TestMyClassifier(iris.data,Parameters,EstParameters))

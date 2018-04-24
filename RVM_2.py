@@ -1,9 +1,5 @@
-from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.gaussian_process.kernels import RBF
+from skbayes.rvm_ard_models import RVC
 from multiprocessing import Pool
-import datetime
-import numpy as np
-
 """
 Parameter range
     {
@@ -26,6 +22,7 @@ Parameter range
 
 core_num = 4
 
+
 def train_classifier(tuple_data):
     return tuple_data[0].fit(tuple_data[1], tuple_data[2])
 
@@ -37,7 +34,7 @@ def TrainMyClassifier(XEstimate, ClassLabels, XValidate, Parameters):
     :param XValidate: data in shape [N, 60]
     :param Parameters:
     {
-        "algorithm": "GPR",
+        "algorithm": "RVM",
         "parameters": {
             "kernel": 6,
             "optimizer": "fmin_l_bfgs_b",
@@ -52,7 +49,7 @@ def TrainMyClassifier(XEstimate, ClassLabels, XValidate, Parameters):
     }
     :return:
     """
-    if Parameters["algorithm"] == "GPR":
+    if Parameters["algorithm"] == "RVM":
         # get the classes from the labels
         classes = np.unique(ClassLabels, axis=0)
         sorted(classes, reverse=True)
@@ -93,33 +90,27 @@ def TrainMyClassifier(XEstimate, ClassLabels, XValidate, Parameters):
                 classifier_matrix[i].append(None)
 
         pool_list = []
-        s1 = datetime.datetime.now()
         for i in range(num_class-1):
             for j in range(i, num_class-1):
-                gpc_classifier = GaussianProcessClassifier(
-                    kernel=Parameters["parameters"]["kernel"],
-                    optimizer=Parameters["parameters"]["optimizer"],
-                    n_restarts_optimizer=Parameters["parameters"]["n_restarts_optimizer"],
-                    max_iter_predict=Parameters["parameters"]["max_iter_predict"],
-                    warm_start=Parameters["parameters"]["warm_start"],
-                    copy_X_train=Parameters["parameters"]["copy_X_train"],
-                    random_state=Parameters["parameters"]["random_state"],
-                    multi_class="one_vs_rest",
-                    n_jobs=Parameters["parameters"]["n_jobs"]
+                rvm_classifier = RVC(
+                    n_iter=Parameters["parameters"]['n_iter'],
+                    tol=Parameters["parameters"]['tol'],
+                    n_iter_solver=Parameters["parameters"]['n_iter_solver'],
+                    tol_solver=Parameters["parameters"]['tol_solver'],
+                    fit_intercept=Parameters["parameters"]['fit_intercept'],
+                    verbose=Parameters["parameters"]['verbose'],
+                    kernel=Parameters["parameters"]['kernel'],
+                    degree=Parameters["parameters"]['degree'],
+                    gamma=Parameters["parameters"]['gamma'],
+                    coef0=Parameters["parameters"]['coef0'],
+                    kernel_params=Parameters["parameters"]['kernel_params']
                 )
-                # gpc_classifier.fit(data_matrix[i][j], target_matrix[i][j])
-                pool_list.append((gpc_classifier, data_matrix[i][j], target_matrix[i][j]))
-                classifier_matrix[i][j] = gpc_classifier
-        e1 = datetime.datetime.now()
-        print("single process run in time %.3f" % ((e1-s1).microseconds / 1000.0))
+                # rvm_classifier.fit(data_matrix[i][j], target_matrix[i][j])
+                pool_list.append((rvm_classifier, data_matrix[i][j], target_matrix[i][j]))
+                classifier_matrix[i][j] = rvm_classifier
 
-        print("==== start training multiple classifier ====")
-        s2 = datetime.datetime.now()
         with Pool(processes=core_num) as pool:
             classifier_list = pool.map(train_classifier, pool_list)
-        e2 = datetime.datetime.now()
-        print("multi process run in time %.3f" % ((e2-s2).microseconds / 1000.0))
-        print("==== finish the training ====")
 
         classifier_counter = 0
         for i in range(num_class-1):
@@ -165,10 +156,16 @@ def TrainMyClassifier(XEstimate, ClassLabels, XValidate, Parameters):
             for j in range(i, num_class-1):
                 estParameters["parameters"].append(
                     {
-                        "log_marginal_likelihood_value_": classifier_matrix[i][j].log_marginal_likelihood_value_,
-                        "classes_": classifier_matrix[i][j].classes_,
-                        "n_classes_": classifier_matrix[i][j].n_classes_,
-                        "base_estimator_": classifier_matrix[i][j].base_estimator_
+                        'relevant_vectors': classifier_matrix[i][j].relevant_vectors_,
+                        'coef': classifier_matrix[i][j].coef_,
+                        'active':  classifier_matrix[i][j].active_,
+                        'intercept': classifier_matrix[i][j].intercept_,
+                        'mean': classifier_matrix[i][j]._x_mean,
+                        'std': classifier_matrix[i][j]._x_std,
+                        'classes': classifier_matrix[i][j].classes_,
+                        'lambda': classifier_matrix[i][j].lambda_,
+                        'sigma': classifier_matrix[i][j].sigma_,
+                        'relevant': classifier_matrix[i][j].relevant_
                     }
                 )
 
@@ -187,22 +184,30 @@ def TestMyClassifier(XTest, Parameters, EstParameters):
     classifier = []
     # init all the classifiers
     for param_dict in EstParameters["parameters"]:
-        gpc_classifier = GaussianProcessClassifier(
-            kernel=Parameters["parameters"]["kernel"],
-            optimizer=Parameters["parameters"]["optimizer"],
-            n_restarts_optimizer=Parameters["parameters"]["n_restarts_optimizer"],
-            max_iter_predict=Parameters["parameters"]["max_iter_predict"],
-            warm_start=Parameters["parameters"]["warm_start"],
-            copy_X_train=Parameters["parameters"]["copy_X_train"],
-            random_state=Parameters["parameters"]["random_state"],
-            multi_class="one_vs_rest",
-            n_jobs=Parameters["parameters"]["n_jobs"]
+        rvm_classifier = RVC(
+            n_iter=Parameters["parameters"]['n_iter'],
+            tol=Parameters["parameters"]['tol'],
+            n_iter_solver=Parameters["parameters"]['n_iter_solver'],
+            tol_solver=Parameters["parameters"]['tol_solver'],
+            fit_intercept=Parameters["parameters"]['fit_intercept'],
+            verbose=Parameters["parameters"]['verbose'],
+            kernel=Parameters["parameters"]['kernel'],
+            degree=Parameters["parameters"]['degree'],
+            gamma=Parameters["parameters"]['gamma'],
+            coef0=Parameters["parameters"]['coef0'],
+            kernel_params=Parameters["parameters"]['kernel_params']
         )
-        gpc_classifier.log_marginal_likelihood_value_ = param_dict["log_marginal_likelihood_value_"]
-        gpc_classifier.classes_ = param_dict["classes_"]
-        gpc_classifier.n_classes_ = param_dict["n_classes_"]
-        gpc_classifier.base_estimator_ = param_dict["base_estimator_"]
-        classifier.append(gpc_classifier)
+        rvm_classifier.relevant_vectors_ = param_dict.get('relevant_vectors')
+        rvm_classifier.relevant_ = param_dict.get('relevant')
+        rvm_classifier.active_ = param_dict.get('active')
+        rvm_classifier.coef_ = param_dict.get('coef')
+        rvm_classifier.intercept_ = param_dict.get('intercept')
+        rvm_classifier._x_mean = param_dict.get('mean')
+        rvm_classifier._x_std = param_dict.get('std')
+        rvm_classifier.classes_ = param_dict.get('classes')
+        rvm_classifier.lambda_ = param_dict.get('lambda')
+        rvm_classifier.sigma_ = param_dict.get('sigma')
+        classifier.append(rvm_classifier)
 
     # put all the classifiers into a matrix, so it is easier for calculation
     classifier_matrix = []
@@ -243,7 +248,7 @@ def TestMyClassifier(XTest, Parameters, EstParameters):
 
     # calculate the probability for the one more class
     std = np.std(result, axis=1)[:, np.newaxis]
-    other_prob = np.exp(-std) / (1 + np.exp(std * 5))
+    other_prob = np.exp(-std) / (1 + np.exp(std * 10))
     result = np.concatenate([result, other_prob], axis=1)
     result = result / np.repeat((other_prob + 1), axis=1, repeats=num_class + 1)
 
@@ -260,27 +265,30 @@ if __name__ == "__main__":
     label_data = np.argmax(label_data, axis=1)[:, np.newaxis]
     dataset = np.concatenate([train_data, label_data], axis=1)
     np.random.shuffle(dataset)
-    training = dataset[:2000]
+    training = dataset[:9000]
     validation = dataset[1000:1100]
     xeval = training[:, :-1]
     xlabel = np.squeeze(training[:, -1:], axis=1)
     xval = validation[:, :-1]
     result, params = TrainMyClassifier(xeval, xlabel, xval,
                       {
-                          "algorithm": "GPR",
-                          "parameters": {
-                              "kernel": 1.0 * RBF(1),
-                              "optimizer": "fmin_l_bfgs_b",
-                              "n_restarts_optimizer": 0,
-                              "max_iter_predict": 10,
-                              "warm_start": True,
-                              "copy_X_train": True,
-                              "random_state": 0,
-                              "multi_class": "one_vs_one",
-                              "n_jobs": 1
+                          "algorithm": "RVM",
+                          "parameters":{
+                              'n_iter':100,
+                              'tol':1e-4,
+                              'n_iter_solver':100,
+                              'tol_solver':1e-4,
+                              'fit_intercept':True,
+                              'verbose': False,
+                              'kernel':'rbf',
+                              'degree': 2,
+                              'gamma': None,
+                              'coef0':1,
+                              'kernel_params': None
                           }
                       })
     xval_target = validation[:, -1:]
+    print(result)
     result = np.argmax(result, axis=1)
     print("eval result: " + str(result))
     count = 0
@@ -290,17 +298,19 @@ if __name__ == "__main__":
     print("eval accurcy: %.3f" % (count / (len(result) * 1.0)))
 
     result = TestMyClassifier(xval, {
-                          "algorithm": "GPR",
-                          "parameters": {
-                              "kernel": 1.0 * RBF(1),
-                              "optimizer": "fmin_l_bfgs_b",
-                              "n_restarts_optimizer": 0,
-                              "max_iter_predict": 15,
-                              "warm_start": True,
-                              "copy_X_train": True,
-                              "random_state": 0,
-                              "multi_class": "one_vs_one",
-                              "n_jobs": 1
+                          "algorithm": "RVM",
+                          "parameters":{
+                              'n_iter':100,
+                              'tol':1e-4,
+                              'n_iter_solver':15,
+                              'tol_solver':1e-4,
+                              'fit_intercept':True,
+                              'verbose': False,
+                              'kernel':'rbf',
+                              'degree': 2,
+                              'gamma': None,
+                              'coef0':1,
+                              'kernel_params': None
                           }
                       }, params)
     result = np.argmax(result, axis=1)

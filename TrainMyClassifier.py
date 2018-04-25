@@ -2,33 +2,20 @@ import numpy as np
 from scipy.special import expit
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.svm import SVC
-from skbayes.rvm_ard_models import RVC
+from skrvm import RVC
 
 def TrainMyClassifier(XEstimate, ClassLabels, XValidate, Parameters ):
 # RVM
     if Parameters['algorithm'] == 'RVM':
         Parameters = Parameters['parameters']
-        clf = RVC(n_iter = Parameters.get('n_iter'), tol = Parameters.get('tol'),
-                    n_iter_solver = Parameters.get('n_iter_solver'), tol_solver = Parameters.get('tol_solver'),
-                    fit_intercept = Parameters.get('fit_intercept'),
-                    verbose = Parameters.get('verbose'),
-                    kernel = Parameters.get('kernel'),
-                    degree = Parameters.get('degree'),
-                    gamma = Parameters.get('gamma'),
-                    coef0 = Parameters.get('coef0'),
-                    kernel_params = Parameters.get('kernel_params') )
 
+        clf =  RVC(alpha=Parameters.get('alpha'),beta=Parameters.get('beta'),n_iter=Parameters.get('n_iter'))
         clf.fit(XEstimate, ClassLabels)
-        prob = clf.predict_proba(XValidate)
-
-        prob_std = np.ndarray.std(prob, axis=1)[:, np.newaxis]
-        sigmoid = 1 - expit(prob_std)
-        Yvalidate = np.concatenate([prob, sigmoid], axis=1)
-        Yvalidate = Yvalidate / np.repeat((sigmoid + 1), axis=1, repeats = np.shape(clf.classes_)[0] + 1)
-
-        EstParameters = { 'relevant_vectors':clf.relevant_vectors_ ,'coef':clf.coef_,'active':clf.active_,
-                          'intercept':clf.intercept_,'mean':clf._x_mean, 'std':clf._x_std,'classes':clf.classes_,
-                          'lambda':clf.lambda_,'sigma':clf.sigma_,'relevant':clf.relevant_}
+        if np.shape(clf.classes_)[0] == 2:
+            Yvalidate = clf.predict_proba(XValidate)
+        else:
+            Yvalidate = predict_proba(clf,XValidate)
+        EstParameters = get_params(clf)
 
         return Yvalidate, EstParameters
 #SVM
@@ -211,5 +198,43 @@ def svc_set_para(svc, svc_para):
     svc.probB_ = svc_para['prob_b']
     svc._gamma = svc_para['gamma']
     svc.classes_ = svc_para['classes']
+
+def predict_proba(clf,XValidate):
+    noOfClasses = np.shape(clf.classes_)[0]
+    noOfClassifiers = (noOfClasses * (noOfClasses-1))/2
+    print('no of Classifiers',noOfClassifiers)
+    dataSize = np.shape(XValidate)[0]
+    Yvalidate = np.zeros((dataSize, np.shape(clf.classes_)[0]))
+    c = 0
+    prob = clf.multi_.estimators_[c].predict_proba(XValidate)
+    #Summing Fkm(X) where k!=m
+    for i in range(0,noOfClasses):
+        for j in range(i, noOfClasses):
+            if (i < j):
+                Yvalidate[:, i] =  Yvalidate[:, i]+ prob[:, 0]
+                Yvalidate[:, j] =  Yvalidate[:, j]+ prob[:, 1]
+                c = c + 1;
+                if(c<noOfClassifiers):
+                    prob = clf.multi_.estimators_[c].predict_proba(XValidate)
+    #Calculating 1/G(summation(ykm))
+    Yvalidate = Yvalidate / np.shape(clf.classes_)[0]
+    #Calculating probability of XValidate  not belonging to any class
+    prob_std = np.ndarray.std(Yvalidate, axis=1)[:, np.newaxis]
+    sigmoid = 1 - expit(prob_std)
+    Yvalidate = np.concatenate([Yvalidate, sigmoid], axis=1)
+    Yvalidate = Yvalidate / np.repeat((sigmoid + 1), axis=1, repeats=np.shape(clf.classes_)[0] + 1)
+    return Yvalidate
+
+def get_params(clf):
+    if np.shape(clf.classes_)[0] == 2:
+        Parameters = [{'phi': clf.phi,'relevance': clf.relevance_,'alpha': clf.alpha_,'beta': clf.beta_,'m': clf.m_,
+                       'gamma': clf.gamma,'bias': clf.bias,'clf': clf}]
+    else :
+        Parameters = [clf]
+        for c in clf.multi_.estimators_:
+            Parameter = {'phi': c.phi,'relevance': c.relevance_,'alpha': c.alpha_,'beta': c.beta_,'m': c.m_,
+                         'gamma': c.gamma,'bias': c.bias,'clf': c}
+            Parameters.append(Parameter)
+    return Parameters
 
 # Helper function for Cross validation.

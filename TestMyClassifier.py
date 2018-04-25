@@ -14,29 +14,14 @@ def TestMyClassifier(XTest,Parameters,EstParameters):
 
         Parameters = Parameters['parameters']
 
-        clf = RVC(n_iter=Parameters.get('n_iter'),
-              tol=Parameters.get('tol'),
-              n_iter_solver=Parameters.get('n_iter_solver'),
-              tol_solver=Parameters.get('tol_solver'),
-              fit_intercept=Parameters.get('fit_intercept'),
-              verbose=Parameters.get('verbose'),
-              kernel=Parameters.get('kernel'),
-              degree=Parameters.get('degree'),
-              gamma=Parameters.get('gamma'),
-              coef0=Parameters.get('coef0'),
-              kernel_params=Parameters.get('kernel_params'))
-
-        clf.relevant_vectors_ = EstParameters.get('relevant_vectors')
-        clf.relevant_ = EstParameters.get('relevant')
-        clf.active_ = EstParameters.get('active')
-        clf.coef_ = EstParameters.get('coef')
-        clf.intercept_ = EstParameters.get('intercept')
-        clf._x_mean = EstParameters.get('mean')
-        clf._x_std = EstParameters.get('std')
-        clf.classes_ = EstParameters.get('classes')
-        clf.lambda_ = EstParameters.get('lambda')
-        clf.sigma_ = EstParameters.get('sigma')
-        Ytest = clf.predict_proba(XTest)
+        if len(EstParameters) == 1:
+            clf = EstParameters.get('clf')
+        else:
+            clf = EstParameters[0]
+        if np.shape(clf.classes_)[0] == 2:
+            Ytest = clf.predict_proba(XTest)
+        else:
+            Ytest = predict_proba(clf,XTest)
 
         return Ytest
 
@@ -106,3 +91,30 @@ def TestMyClassifier(XTest,Parameters,EstParameters):
         result = result / np.repeat((other_prob + 1), axis=1, repeats=num_class + 1)
 
         return result
+
+
+def predict_proba(clf,XValidate):
+    noOfClasses = np.shape(clf.classes_)[0]
+    noOfClassifiers = (noOfClasses * (noOfClasses-1))/2
+    print('no of Classifiers',noOfClassifiers)
+    dataSize = np.shape(XValidate)[0]
+    Yvalidate = np.zeros((dataSize, np.shape(clf.classes_)[0]))
+    c = 0
+    prob = clf.multi_.estimators_[c].predict_proba(XValidate)
+    #Summing Fkm(X) where k!=m
+    for i in range(0,noOfClasses):
+        for j in range(i, noOfClasses):
+            if (i < j):
+                Yvalidate[:, i] =  Yvalidate[:, i]+ prob[:, 0]
+                Yvalidate[:, j] =  Yvalidate[:, j]+ prob[:, 1]
+                c = c + 1;
+                if(c<noOfClassifiers):
+                    prob = clf.multi_.estimators_[c].predict_proba(XValidate)
+    #Calculating 1/G(summation(ykm))
+    Yvalidate = Yvalidate / np.shape(clf.classes_)[0]
+    #Calculating probability of XValidate  not belonging to any class
+    prob_std = np.ndarray.std(Yvalidate, axis=1)[:, np.newaxis]
+    sigmoid = 1 - expit(prob_std)
+    Yvalidate = np.concatenate([Yvalidate, sigmoid], axis=1)
+    Yvalidate = Yvalidate / np.repeat((sigmoid + 1), axis=1, repeats=np.shape(clf.classes_)[0] + 1)
+    return Yvalidate

@@ -41,15 +41,15 @@ def MyCrossValidate(XTrain, ClassLabels, Nf):
             Array of ConfMatrix:
     """
 
-    algorithms = ['SVM']
+    algorithms = ['RVM']
     parameters = {'SVM':{'C' : [1, 5, 10], 'kernel' : ['rbf','poly'], 'degree' : [2, 3, 5], 'gamma' : ['auto'],
                             'coef0' : [0.0], 'probability' : [True], 'shrinking' : [True], 'tol' : [1e-3, 1e-4],
                             'class_weight' : ['balanced'], 'verbose' : [False], 'max_iter' : [-1],
                             'decision_function_shape' : ['ovo'], 'random_state' : [None], 'cache_size': [800]},
 
-                 'RVM':{ 'n_iter':[10, 20, 30], 'tol':[1e-4], 'n_iter_solver':[15], 'tol_solver':[1e-4],
-                 'fit_intercept':[True], 'verbose': [False], 'kernel':['rbf'], 'degree': [2],
-                 'gamma': [None], 'coef0':[1], 'kernel_params':[None]},
+                 'RVM':{ 'kernel':['rbf'],'degree':[3],'coef1':[None],'coef0':[0.0],'n_iter':[5],'tol':[1e-3],
+                        'alpha':[100,1,1e-6],'threshold_alpha':[1e9],'beta':[1.e-2,1.e-6,1.e-8],'beta_fixed':[False],
+                        'bias_used':[True],'verbose':[False]},
                  'GPR':{"kernel": [ 1.0 * RBF(1),
                                     2.0 * RBF(1),
                                     3.0 * RBF(1),

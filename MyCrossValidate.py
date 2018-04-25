@@ -144,7 +144,14 @@ def MyCrossValidate(XTrain, ClassLabels, Nf):
             if  algo == 'SVM':
                 print('Number of support vector for validation set {}: {}'.format(index, len(Estparameters['support_vectors'])))
             elif  algo == 'RVM':
-                print('Number of relavance vector for validation set {}: {}'.format(index, len(Estparameters['relevant_vectors'])))
+                if len(Estparameters) == 1:
+                    relevant_vectors = np.shape(Estparameters.get('clf').relevance_)[0]
+                else:
+                    relevant_vectors = 0
+                    for clf in Estparameters[0].multi_.estimators_:
+                        relevant_vectors = relevant_vectors + np.shape(clf.relevance_)[0]
+                    relevant_vectors = relevant_vectors/2
+                print('Number of relavance vector for validation set {}: {}'.format(index, relevant_vectors))
 
             # calculating confusion matrix for validation set
             print("Confusion matrix for validation set {}: ".format(index))

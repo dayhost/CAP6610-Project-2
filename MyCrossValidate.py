@@ -41,7 +41,7 @@ def MyCrossValidate(XTrain, ClassLabels, Nf):
             Array of ConfMatrix:
     """
 
-    algorithms = ['RVM']
+    algorithms = ['SVM','RVM', 'GPR']
     parameters = {'SVM':{'C' : [1, 5, 10], 'kernel' : ['rbf','poly'], 'degree' : [2, 3, 5], 'gamma' : ['auto'],
                             'coef0' : [0.0], 'probability' : [True], 'shrinking' : [True], 'tol' : [1e-3, 1e-4],
                             'class_weight' : ['balanced'], 'verbose' : [False], 'max_iter' : [-1],
@@ -58,7 +58,7 @@ def MyCrossValidate(XTrain, ClassLabels, Nf):
                                     ],
                               "optimizer": ["fmin_l_bfgs_b"],
                               "n_restarts_optimizer": [0],
-                              "max_iter_predict": [100],
+                              "max_iter_predict": [20],
                               "warm_start": [True],
                               "copy_X_train": [True],
                               "random_state": [0],
@@ -150,7 +150,7 @@ def MyCrossValidate(XTrain, ClassLabels, Nf):
                     relevant_vectors = 0
                     for clf in Estparameters[0].multi_.estimators_:
                         relevant_vectors = relevant_vectors + np.shape(clf.relevance_)[0]
-                    relevant_vectors = relevant_vectors/2
+                    relevant_vectors = int( relevant_vectors/2)
                 print('Number of relavance vector for validation set {}: {}'.format(index, relevant_vectors))
 
             # calculating confusion matrix for validation set

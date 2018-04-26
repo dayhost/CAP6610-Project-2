@@ -202,7 +202,6 @@ def svc_set_para(svc, svc_para):
 def predict_proba(clf,XValidate):
     noOfClasses = np.shape(clf.classes_)[0]
     noOfClassifiers = (noOfClasses * (noOfClasses-1))/2
-    print('no of Classifiers',noOfClassifiers)
     dataSize = np.shape(XValidate)[0]
     Yvalidate = np.zeros((dataSize, np.shape(clf.classes_)[0]))
     c = 0

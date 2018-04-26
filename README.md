@@ -11,9 +11,9 @@
 - Third, run the notebook from top to the botton
 
 ## How to run your own test data
-- If you want to change test data, you could find the cell under "Test My Classifier".
-- Then, load your data in the script and change the first parameter of "TestMyClassifier" function to your dataset.
-- Third, run the "restore parameter" cell and run the testing code.
+- If you want to change test data, you could find the cell under "Load the test data set".
+- Then, load your data in the script and go to next cell under "Run TestMyClassifier to get YTest".
+- Third, run the "Test accuracy" cell to see the accuracy of the test data.
 
 ## Project Structure
 - There are 4 python files and 1 python-notebook file

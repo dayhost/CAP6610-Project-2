@@ -34,7 +34,7 @@ skbayes==0.1.0a1
 tornado==5.0.2
 tqdm==4.23.0
 traitlets==4.3.2
-urllib3==1.22
+urllib3==1.26.5
 wcwidth==0.1.7
 https://github.com/JamesRitchie/scikit-rvm/archive/master.zip
 https://github.com/AmazaspShumik/sklearn_bayes/archive/master.zip
